@@ -1,68 +1,63 @@
 # Sentinel JML Automation
 
-Approval-driven Joiner–Mover–Leaver automation for Active Directory.
+Approval-driven Joiner-Mover-Leaver automation for Active Directory.
 
-## 1. คืออะไร
+## 1. What it is
 
-JML ย่อมาจาก Joiner (พนักงานเข้าใหม่), Mover (ย้ายแผนก/role) และ Leaver (สิ้นสุดการจ้างงาน) โปรเจกต์นี้เป็น workflow สำหรับควบคุมการเปลี่ยนแปลง Active Directory ให้มี requester, approval, execution plan, verification, ticket และ audit trail ครบในเส้นทางเดียว
+Sentinel JML Automation is a controlled identity-lifecycle workflow for three employee events:
 
-โปรเจกต์ต่อยอดจาก bulk AD provisioning ใน `home-lab-v2` และมีจุดเชื่อมต่อในอนาคตกับ SentinelGRC เพื่อส่ง access-review evidence และ governance finding
+- **Joiner:** a new employee joins the organization.
+- **Mover:** an employee changes department or role.
+- **Leaver:** an employee leaves the organization.
 
-ปัญหาที่ MVP ตั้งใจแก้คือ account provisioning ที่ช้า, OU/group ผิด, สิทธิ์ค้างหลังย้ายแผนก, enabled account หลังพนักงานลาออก, orphan/stale account และการเปลี่ยนแปลงที่ไม่มีหลักฐานตรวจสอบย้อนหลัง
+The MVP connects request submission, validation, approval, execution planning, execution, verification, ticket tracking, and audit evidence in one workflow. It is designed to make Active Directory changes repeatable, reviewable, and safer than manual administration.
 
-MVP รองรับ Joiner, Mover และ Leaver โดย Leaver จะ disable account และถอด managed groups แต่ไม่ลบบัญชีหรือข้อมูล
+The project extends the bulk Active Directory provisioning work from `home-lab-v2` and is designed to provide future access-review evidence to [SentinelGRC](https://github.com/SuriyaBoon/SentinelGRC).
 
-## 2. ทำงานยังไง
+The MVP addresses slow provisioning, incorrect OU or group placement, stale access after department changes, enabled accounts after termination, orphaned accounts, and changes without reliable audit evidence.
 
-ระบบทำงานตาม lifecycle นี้:
+The Leaver workflow disables the account and removes managed group memberships. It does not delete the account or its data, leaving retention decisions to the organization.
 
-```text
-Request → Validate → Approve → Plan → Execute → Verify → Close
-```
+## 2. How it works
 
-ข้อมูล request และ state เก็บใน SQLite การ execute จะเกิดหลัง approval เท่านั้น และค่าเริ่มต้นเป็น dry-run
-
-กฎสำคัญ:
+The workflow is implemented as an approval-controlled state machine:
 
 ```text
-ผู้ร้องขอ ≠ ผู้อนุมัติ
-ผู้ execute ≠ ผู้ verify
-ต้อง approved ก่อนสร้าง execution plan
-ต้อง verification ผ่านก่อน close
+Request -> Validate -> Approve -> Plan -> Execute -> Verify -> Close
 ```
 
-Joiner จะสร้างแผนสำหรับ account, OU, department groups, home directory และ force password change
+Requests and lifecycle state are persisted in SQLite. Execution is allowed only after approval, and the default executor is a dry-run adapter.
 
-Mover จะถอด groups ของ department เดิม ย้าย OU และเพิ่ม groups ของ department ใหม่
-
-Leaver จะ disable account และถอด managed group access โดยเก็บ account/data ไว้สำหรับ retention decision
-
-สถาปัตยกรรมเต็มและ state machine อยู่ที่ [`docs/blueprint.md`](docs/blueprint.md)
-
-This MVP demonstrates one safe identity-lifecycle workflow:
+The main control rules are:
 
 ```text
-Request → Validate → Approve → Plan → Execute → Verify → Close
+Requester != Approver
+Executor != Verifier
+Approval is required before an execution plan is created
+Verification is required before a request can be closed
 ```
 
-The default executor is a dry-run adapter. It never changes Active Directory. A PowerShell adapter contract is included for a lab deployment with delegated permissions.
+Joiner planning creates account, OU, department-group, home-directory, and forced-password-change operations.
 
-## 3. คำสั่งที่ใช้
+Mover planning removes old department groups, moves the account to the new OU, and assigns new department groups.
 
-- Joiner: create an account, place it in the department OU, assign mapped groups, and plan a home directory.
-- Mover: remove old department groups and assign the new department groups.
-- Leaver: disable the account and remove managed group memberships without deleting data.
-- Manager/HR approval with requester/approver separation.
-- Idempotent request identity and execution planning.
-- SQLite persistence, tamper-evident audit events, verification, and JSON ticket export.
-- Dry-run execution and post-change verification contract.
+Leaver planning disables the account and removes managed group memberships without deleting the account or data.
 
-HRIS, Microsoft 365, real ticketing, SSO/MFA, and destructive account deletion are deliberately outside this MVP.
+The complete architecture and state machine are documented in [`docs/blueprint.md`](docs/blueprint.md).
+
+This MVP demonstrates a safe identity-lifecycle workflow. It does not claim to be a complete enterprise IAM platform or a live production Active Directory deployment.
+
+## 3. Commands used
+
+### Initialize the database
+
+```powershell
+python -m jml.cli init --db runtime/jml.db
+```
 
 ### Joiner workflow
 
 ```powershell
-python -m jml.cli init --db runtime/jml.db
 python -m jml.cli submit --db runtime/jml.db --request sample_data/joiner.json
 python -m jml.cli approve --db runtime/jml.db --request JML-000001 --actor manager-01
 python -m jml.cli plan --db runtime/jml.db --request JML-000001 --actor iam-01
@@ -71,47 +66,55 @@ python -m jml.cli verify --db runtime/jml.db --request JML-000001 --actor verifi
 python -m jml.cli close --db runtime/jml.db --request JML-000001 --actor verifier-01 --reason "All post-change checks passed"
 ```
 
-Mover and leaver ใช้ `sample_data/mover.json` และ `sample_data/leaver.json` ตามลำดับ
+Use [`sample_data/mover.json`](sample_data/mover.json) or [`sample_data/leaver.json`](sample_data/leaver.json) to test the other lifecycle events.
 
-ส่งออก execution plan เพื่อรีวิวก่อน execute:
-
-```powershell
-python -m jml.cli --db runtime/jml.db plan --request JML-000001 --actor iam-01 --output runtime/plan.json
-```
-
-ดู state และ audit timeline:
+### Export an execution plan for review
 
 ```powershell
-python -m jml.cli --db runtime/jml.db show --request JML-000001
+python -m jml.cli plan --db runtime/jml.db --request JML-000001 --actor iam-01 --output runtime/plan.json
 ```
 
-รัน PowerShell adapter แบบปลอดภัย:
+### View request state and audit history
+
+```powershell
+python -m jml.cli show --db runtime/jml.db --request JML-000001
+```
+
+### Run the PowerShell adapter safely
 
 ```powershell
 .\powershell\Invoke-JMLPlan.ps1 -PlanPath runtime/plan.json -DryRun
 ```
 
-Tickets ถูกเขียนเป็น `runtime/tickets.json` โดย local adapter เพื่อให้ตรวจสอบได้ง่าย
+The local ticket adapter writes reviewable records to `runtime/tickets.json`.
 
-Run all tests:
+### Run all tests
 
 ```powershell
 python -m unittest discover -v
 ```
 
-## 4. หลักฐานการทำงานพิสูจน์ว่าใช้ได้
+## 4. Evidence that it works
 
-ผลการตรวจล่าสุด:
+The current repository validation demonstrates:
 
 ```text
-6 tests — OK
-Python compile check — OK
-CLI end-to-end smoke test — OK
+6 tests - OK
+Python compile check - OK
+CLI end-to-end smoke test - OK
 ```
 
-Test ครอบคลุม Joiner lifecycle, Mover group transition, Leaver no-delete policy, approval/verification separation, replay rejection, audit events และ ticket creation ที่ [`tests/test_jml.py`](tests/test_jml.py)
+The tests cover:
 
-เมื่อ Joiner สำเร็จ สถานะสุดท้ายต้องเป็น `closed` และ audit timeline ต้องมี:
+- complete Joiner lifecycle;
+- Mover group transition planning;
+- Leaver no-delete policy;
+- requester, approver, executor, and verifier separation;
+- replay rejection and idempotency controls;
+- audit event creation;
+- ticket creation and lifecycle updates.
+
+For a successful Joiner workflow, the audit timeline contains:
 
 ```text
 request_submitted
@@ -124,56 +127,58 @@ verification_completed
 request_closed
 ```
 
-หลักฐานนี้พิสูจน์ workflow และ policy ของ MVP ได้ แต่ยังไม่ใช่ live AD evidence เพราะใช้ dry-run adapter และ SQLite lab database การทดสอบถัดไปต้องทำใน isolated AD lab ด้วย delegated service account
+The evidence proves the MVP workflow and its safety policies work in the isolated test environment. It is not live Active Directory evidence because the default executor is dry-run and the repository uses a local SQLite database. Live validation should be performed in an isolated AD lab using a delegated service account before any production deployment.
 
-## 5. แก้ปัญหาอะไร
+## 5. What problem it solves
 
-โปรเจกต์นี้ลดความเสี่ยงและงาน manual ใน identity lifecycle โดยเปลี่ยนจากการแก้ AD แบบไม่มีมาตรฐานเป็น:
+The project replaces uncontrolled manual identity changes with an approved and repeatable operating process:
 
 ```text
 Manual account changes
-→ Approved and repeatable identity lifecycle
+    -> Approved identity lifecycle workflow
+    -> Verifiable execution and audit evidence
 ```
 
-ผลกระทบที่วัดได้เมื่อเชื่อม AD จริง:
+When connected to real Active Directory, the expected operational benefits are:
 
-- ลดเวลาสร้าง account ใหม่
-- ลด provisioning error
-- ลด orphan/stale account
-- ลดสิทธิ์ค้างหลังย้ายแผนก
-- ลดเวลา offboarding
-- เพิ่ม request ที่มี approval และ verification
-- ตรวจสอบย้อนหลังได้ว่าใครทำอะไร เมื่อไหร่ และกับบัญชีใด
+- faster account provisioning;
+- fewer provisioning and group-assignment errors;
+- fewer stale or orphaned accounts;
+- faster and more consistent offboarding;
+- clearer ownership and approval evidence;
+- easier investigation of who changed what and when.
 
-ความสัมพันธ์กับ SentinelGRC:
+The relationship with SentinelGRC is:
 
 ```text
 JML Automation
-→ ทำ approved identity change
-→ สร้าง access-review evidence
-→ SentinelGRC ตรวจ control
-→ สร้าง governance finding เมื่อพบ orphan/stale access
+    -> performs approved identity changes
+    -> produces access-review evidence
+    -> SentinelGRC evaluates the relevant control
+    -> governance findings are created for orphaned or excessive access
 ```
 
-JML เป็น operational automation layer ส่วน SentinelGRC เป็น governance and assurance layer
+JML Automation is the operational identity-change layer. SentinelGRC is the governance and assurance layer.
 
 ## Safety model
 
 - No execution before approval.
 - Dry-run is the default for the CLI executor.
-- Requester cannot approve their own request.
-- Executor cannot verify the same request.
+- A requester cannot approve their own request.
+- An executor cannot verify the same request.
 - Leaver operations disable access; they do not delete accounts.
 - Secrets are not stored in this repository.
-- Every lifecycle action is written to an append-only hash chain.
-- Ticket creation and closure are recorded in the local reviewable ticket adapter.
+- Lifecycle actions are written to an append-only, tamper-evident hash chain.
+- Ticket creation and closure are recorded by the local reviewable ticket adapter.
 
 ## Planned integration
 
 ```text
-JML Automation → AD access review evidence → SentinelGRC governance finding
+JML Automation -> Active Directory access-review evidence -> SentinelGRC governance finding
 ```
 
 ## Production boundary
 
-Before production use, replace SQLite with PostgreSQL, add OIDC/SSO and MFA, use a managed secret store, run PowerShell through a delegated service identity, add TLS/WAF and durable jobs, and test backup/restore and incident recovery.
+Before production use, replace SQLite with PostgreSQL, add OIDC/SSO and MFA, use a managed secret store, run PowerShell through a delegated service identity, add TLS/WAF and durable job processing, and test backup, restore, monitoring, and incident recovery.
+
+HRIS, Microsoft 365, real ticketing, SSO/MFA, and destructive account deletion are intentionally outside this MVP.
