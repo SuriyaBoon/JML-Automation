@@ -47,6 +47,53 @@ The complete architecture and state machine are documented in [`docs/blueprint.m
 
 This MVP demonstrates a safe identity-lifecycle workflow. It does not claim to be a complete enterprise IAM platform or a live production Active Directory deployment.
 
+### Architecture diagram
+
+```mermaid
+flowchart TB
+    HR["HR / Manager"] --> REQUEST["JML Request"]
+    REQUEST --> POLICY["Validation and Approval Policy"]
+    POLICY --> PLAN["Execution Plan"]
+    PLAN --> EXECUTOR["IAM Executor"]
+    EXECUTOR --> AD["Active Directory"]
+    EXECUTOR --> HOME["Home Directory"]
+    EXECUTOR --> TICKET["Ticket Adapter"]
+    EXECUTOR --> VERIFY["Post-change Verification"]
+    REQUEST --> DB["SQLite Workflow Store"]
+    POLICY --> DB
+    PLAN --> DB
+    VERIFY --> DB
+    REQUEST --> AUDIT["Hash-chained Audit Log"]
+    POLICY --> AUDIT
+    EXECUTOR --> AUDIT
+    VERIFY --> AUDIT
+    AD -. "Access-review evidence" .-> GRC["SentinelGRC"]
+```
+
+### Lifecycle sequence diagram
+
+```mermaid
+sequenceDiagram
+    actor Requester
+    participant JML as JML Automation
+    actor Approver
+    actor IAM as IAM Operator
+    participant AD as Active Directory
+    actor Verifier
+    participant GRC as SentinelGRC
+
+    Requester->>JML: Submit Joiner, Mover, or Leaver request
+    JML->>JML: Validate request and create ticket
+    Approver->>JML: Approve request
+    IAM->>JML: Generate reviewed execution plan
+    IAM->>AD: Execute approved change or dry-run
+    JML->>JML: Record execution and audit events
+    Verifier->>JML: Verify post-change state
+    JML->>JML: Close request after verification
+    AD-->>GRC: Provide access-review evidence
+    GRC->>GRC: Evaluate control and record findings
+```
+
 ## 3. Commands used
 
 ### Initialize the database
