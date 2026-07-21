@@ -1,0 +1,14 @@
+{
+  "request_id": "JML-000003",
+  "request_type": "leaver",
+  "employee_id": "EMP-1003",
+  "username": "bcarter",
+  "first_name": "Ben",
+  "last_name": "Carter",
+  "department": "Sales",
+  "manager_id": "manager-02",
+  "requested_by": "hr-01",
+  "effective_at": "2026-08-20T17:00:00Z",
+  "reason": "Employment ended"
+}
+

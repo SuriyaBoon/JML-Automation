@@ -1,0 +1,16 @@
+{
+  "request_id": "JML-000002",
+  "request_type": "mover",
+  "employee_id": "EMP-1002",
+  "username": "adoe",
+  "first_name": "Ann",
+  "last_name": "Doe",
+  "old_department": "Sales",
+  "department": "IT",
+  "job_title": "Support Engineer",
+  "manager_id": "manager-01",
+  "requested_by": "hr-01",
+  "effective_at": "2026-08-15T09:00:00Z",
+  "reason": "Internal transfer"
+}
+

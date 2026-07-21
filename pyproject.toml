@@ -1,0 +1,6 @@
+[project]
+name = "sentinel-jml-automation"
+version = "0.1.0"
+description = "Approval-driven Joiner-Mover-Leaver automation MVP"
+requires-python = ">=3.11"
+

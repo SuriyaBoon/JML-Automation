@@ -1,0 +1,15 @@
+{
+  "IT": {
+    "ou": "OU=IT,OU=Users,DC=corp,DC=local",
+    "groups": ["grp-IT-All", "grp-IT-Helpdesk"]
+  },
+  "HR": {
+    "ou": "OU=HR,OU=Users,DC=corp,DC=local",
+    "groups": ["grp-HR-All"]
+  },
+  "Sales": {
+    "ou": "OU=Sales,OU=Users,DC=corp,DC=local",
+    "groups": ["grp-Sales-All"]
+  }
+}
+

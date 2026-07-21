@@ -1,0 +1,15 @@
+{
+  "request_id": "JML-000001",
+  "request_type": "joiner",
+  "employee_id": "EMP-1001",
+  "username": "jsmith",
+  "first_name": "John",
+  "last_name": "Smith",
+  "department": "IT",
+  "job_title": "Support Technician",
+  "manager_id": "manager-01",
+  "requested_by": "hr-01",
+  "effective_at": "2026-08-01T09:00:00Z",
+  "reason": "New hire"
+}
+
