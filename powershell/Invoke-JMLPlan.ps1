@@ -1,7 +1,8 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory)] [string]$PlanPath,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [securestring]$InitialPassword
 )
 
 Set-StrictMode -Version Latest
@@ -20,12 +21,15 @@ foreach ($operation in $plan) {
     # Production/lab adapter boundary: use a delegated service identity and
     # explicit cmdlets here. Never run this workflow as Domain Admin.
     switch ($operation.op) {
-        'create_user' { New-ADUser -SamAccountName $operation.username -GivenName $operation.first_name -Surname $operation.last_name -Title $operation.job_title -Path $operation.ou -Enabled $true }
+        'create_user' {
+            if (-not $InitialPassword) { throw 'InitialPassword is required for a non-dry-run create_user operation.' }
+            New-ADUser -SamAccountName $operation.username -GivenName $operation.first_name -Surname $operation.last_name -Title $operation.job_title -Path $operation.ou -AccountPassword $InitialPassword -Enabled $true
+        }
         'disable_user' { Disable-ADAccount -Identity $operation.username }
         'move_ou' { Move-ADObject -Identity (Get-ADUser $operation.username).DistinguishedName -TargetPath $operation.ou }
         'set_groups' { foreach ($group in $operation.groups) { Add-ADGroupMember -Identity $group -Members $operation.username } }
         'remove_groups' { foreach ($group in $operation.groups) { Remove-ADGroupMember -Identity $group -Members $operation.username -Confirm:$false } }
-        'remove_managed_groups' { Write-Warning 'Managed group removal requires an approved group allowlist.' }
+        'remove_managed_groups' { foreach ($group in $operation.groups) { Remove-ADGroupMember -Identity $group -Members $operation.username -Confirm:$false } }
         'force_password_change' { Set-ADUser -Identity $operation.username -ChangePasswordAtLogon $true }
         'create_home_directory' { Write-Warning 'Home directory creation requires an approved filesystem adapter.' }
         default { throw "Unsupported JML operation: $($operation.op)" }

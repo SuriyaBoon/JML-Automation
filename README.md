@@ -99,7 +99,7 @@ sequenceDiagram
 ### Initialize the database
 
 ```powershell
-python -m jml.cli init --db runtime/jml.db
+python -m jml.cli --db runtime/jml.db init
 ```
 
 ### Joiner workflow
@@ -134,6 +134,15 @@ python -m jml.cli show --db runtime/jml.db --request JML-000001
 ```
 
 The local ticket adapter writes reviewable records to `runtime/tickets.json`.
+
+The CLI intentionally blocks non-dry-run execution. After reviewing and approving the generated plan, run the delegated PowerShell adapter explicitly in an isolated AD lab. For a Joiner plan, provide an initial password securely at execution time:
+
+```powershell
+$initialPassword = Read-Host "Initial password" -AsSecureString
+.\powershell\Invoke-JMLPlan.ps1 -PlanPath runtime/plan.json -InitialPassword $initialPassword -Confirm
+```
+
+Never place an initial password in JSON, source control, command history, or screenshots.
 
 ### Run all tests
 

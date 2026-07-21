@@ -72,7 +72,7 @@ class JMLService:
             old = self.departments[request["old_department"]]
             operations = [{"op": "remove_groups", "username": request["username"], "groups": old["groups"]}, {"op": "move_ou", "username": request["username"], "ou": current["ou"]}, {"op": "set_groups", "username": request["username"], "groups": current["groups"]}]
         elif kind == "leaver":
-            operations = [{"op": "disable_user", "username": request["username"]}, {"op": "remove_managed_groups", "username": request["username"]}]
+            operations = [{"op": "disable_user", "username": request["username"]}, {"op": "remove_managed_groups", "username": request["username"], "groups": current["groups"]}]
         self.store.add_plan(request_id, operations)
         self.store.set_status(request_id, "planned")
         self.store.audit(request_id, actor.actor_id, actor.role, "plan_created", {"operations": operations})
@@ -84,6 +84,8 @@ class JMLService:
             raise PermissionError("only IAM operator or admin can execute")
         if request["status"] != "planned":
             raise ValueError(f"request cannot execute from {request['status']}")
+        if not dry_run:
+            raise RuntimeError("live execution is not available in the CLI; review the plan and run the delegated PowerShell adapter explicitly")
         operations = self.store.get_plan(request_id)
         self.store.set_status(request_id, "executing")
         self.store.audit(request_id, actor.actor_id, actor.role, "execution_started", {"dry_run": dry_run, "operations": operations})

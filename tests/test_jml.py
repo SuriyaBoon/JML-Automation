@@ -57,7 +57,16 @@ class JMLWorkflowTests(unittest.TestCase):
         self.service.approve("JML-2", Actor("manager-1", "manager"), "Termination approved")
         operations = self.service.plan("JML-2", Actor("iam-1", "iam_operator"))
         self.assertEqual([item["op"] for item in operations], ["disable_user", "remove_managed_groups"])
+        self.assertEqual(operations[1]["groups"], DEPARTMENTS["IT"]["groups"])
         self.assertNotIn("delete_user", json.dumps(operations))
+
+    def test_live_execution_is_blocked_until_adapter_is_explicit(self):
+        self.service.submit(self.request, Actor("hr-1", "hr"))
+        self.service.approve("JML-1", Actor("manager-1", "manager"), "Approved")
+        self.service.plan("JML-1", Actor("iam-1", "iam_operator"))
+        with self.assertRaisesRegex(RuntimeError, "live execution is not available"):
+            self.service.execute("JML-1", Actor("iam-1", "iam_operator"), dry_run=False)
+        self.assertEqual(self.service.store.get("JML-1")["status"], "planned")
 
     def test_mover_has_remove_and_add_operations(self):
         request = JMLRequest("JML-3", "mover", "EMP-3", "adoe", "Ann", "Doe", "IT", "manager-1", "hr-1", "2026-08-02T09:00:00Z", old_department="Sales")
