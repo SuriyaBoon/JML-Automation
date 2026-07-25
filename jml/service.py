@@ -33,6 +33,8 @@ class JMLService:
             raise PermissionError("only manager, HR, or admin can approve")
         if actor.actor_id == request["requested_by"]:
             raise PermissionError("requester cannot approve the same request")
+        if actor.role == "manager" and actor.actor_id != request["manager_id"]:
+            raise PermissionError("manager can only approve requests assigned to that manager")
         if request["status"] != "pending_approval":
             raise ValueError(f"request cannot be approved from {request['status']}")
         if not reason.strip():

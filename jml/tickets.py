@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -15,10 +16,23 @@ class JSONTicketAdapter:
     def _read(self) -> list[dict[str, Any]]:
         if not self.path.exists():
             return []
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        try:
+            tickets = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"ticket store cannot be read: {self.path}") from exc
+        if not isinstance(tickets, list) or any(not isinstance(ticket, dict) for ticket in tickets):
+            raise RuntimeError(f"ticket store has invalid format: {self.path}")
+        return tickets
 
     def _write(self, tickets: list[dict[str, Any]]) -> None:
-        self.path.write_text(json.dumps(tickets, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary = self.path.with_name(self.path.name + ".tmp")
+        try:
+            temporary.write_text(json.dumps(tickets, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, self.path)
+        except OSError as exc:
+            raise RuntimeError(f"ticket store cannot be written: {self.path}") from exc
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def create(self, request: dict[str, Any]) -> dict[str, Any]:
         tickets = self._read()
@@ -45,4 +59,3 @@ class JSONTicketAdapter:
                 self._write(tickets)
                 return ticket
         raise KeyError(f"ticket not found for request: {request_id}")
-

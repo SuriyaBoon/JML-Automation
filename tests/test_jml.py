@@ -19,7 +19,7 @@ class JMLWorkflowTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.service = JMLService(JMLStore(str(Path(self.temp.name) / "jml.db")), DEPARTMENTS, JSONTicketAdapter(str(Path(self.temp.name) / "tickets.json")))
-        self.request = JMLRequest("JML-1", "joiner", "EMP-1", "jsmith", "John", "Smith", "IT", "manager-1", "hr-1", "2026-08-01T09:00:00Z")
+        self.request = JMLRequest("JML-1", "joiner", "EMP-1", "jsmith", "John", "Smith", "IT", "manager-1", "hr-1", "2026-08-01T09:00:00Z", job_title="Support Technician")
 
     def tearDown(self):
         self.temp.cleanup()
@@ -46,6 +46,25 @@ class JMLWorkflowTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.service.verify("JML-1", Actor("iam-1", "verifier"), True, {})
 
+    def test_manager_can_only_approve_assigned_requests(self):
+        self.service.submit(self.request, Actor("hr-1", "hr"))
+        with self.assertRaisesRegex(PermissionError, "assigned to that manager"):
+            self.service.approve("JML-1", Actor("manager-2", "manager"), "Unauthorized approval")
+
+    def test_request_validation_rejects_null_timestamp_and_unknown_old_department(self):
+        invalid_timestamp = JMLRequest("JML-4", "joiner", "EMP-4", "valid.user", "Jane", "Doe", "IT", "manager-1", "hr-1", None, job_title="Engineer")
+        with self.assertRaisesRegex(ValueError, "effective_at is required"):
+            invalid_timestamp.validate(DEPARTMENTS)
+        invalid_old_department = JMLRequest("JML-5", "mover", "EMP-5", "valid.user", "Jane", "Doe", "IT", "manager-1", "hr-1", "2026-08-02T09:00:00Z", old_department="Finance", job_title="Engineer")
+        with self.assertRaisesRegex(ValueError, "unknown old department"):
+            invalid_old_department.validate(DEPARTMENTS)
+
+    def test_ticket_store_rejects_corrupt_json(self):
+        ticket_path = Path(self.temp.name) / "tickets.json"
+        ticket_path.write_text("{not-json", encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "ticket store cannot be read"):
+            JSONTicketAdapter(str(ticket_path)).create(self.request.to_dict())
+
     def test_replay_is_rejected(self):
         self.service.submit(self.request, Actor("hr-1", "hr"))
         with self.assertRaises(Exception):
@@ -69,7 +88,7 @@ class JMLWorkflowTests(unittest.TestCase):
         self.assertEqual(self.service.store.get("JML-1")["status"], "planned")
 
     def test_mover_has_remove_and_add_operations(self):
-        request = JMLRequest("JML-3", "mover", "EMP-3", "adoe", "Ann", "Doe", "IT", "manager-1", "hr-1", "2026-08-02T09:00:00Z", old_department="Sales")
+        request = JMLRequest("JML-3", "mover", "EMP-3", "adoe", "Ann", "Doe", "IT", "manager-1", "hr-1", "2026-08-02T09:00:00Z", old_department="Sales", job_title="Support Engineer")
         self.service.submit(request, Actor("hr-1", "hr"))
         self.service.approve("JML-3", Actor("manager-1", "manager"), "Transfer approved")
         operations = self.service.plan("JML-3", Actor("iam-1", "iam_operator"))

@@ -155,7 +155,7 @@ python -m unittest discover -v
 The current repository validation demonstrates:
 
 ```text
-7 tests - OK
+10 tests - OK
 Python compile check - OK
 CLI end-to-end smoke test - OK
 ```
@@ -184,6 +184,8 @@ request_closed
 ```
 
 The evidence proves the MVP workflow and its safety policies work in the isolated test environment. It is not live Active Directory evidence because the default executor is dry-run and the repository uses a local SQLite database. Live validation should be performed in an isolated AD lab using a delegated service account before any production deployment.
+
+The CLI actor and role arguments are workflow inputs for this MVP, not an authentication system. Production deployment must derive identity and authorization from a trusted SSO, Windows, or service-identity integration.
 
 ## 5. What problem it solves
 
