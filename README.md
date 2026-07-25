@@ -105,12 +105,12 @@ python -m jml.cli --db runtime/jml.db init
 ### Joiner workflow
 
 ```powershell
-python -m jml.cli submit --db runtime/jml.db --request sample_data/joiner.json
-python -m jml.cli approve --db runtime/jml.db --request JML-000001 --actor manager-01
-python -m jml.cli plan --db runtime/jml.db --request JML-000001 --actor iam-01
-python -m jml.cli execute --db runtime/jml.db --request JML-000001 --actor iam-01 --dry-run
-python -m jml.cli verify --db runtime/jml.db --request JML-000001 --actor verifier-01 --passed
-python -m jml.cli close --db runtime/jml.db --request JML-000001 --actor verifier-01 --reason "All post-change checks passed"
+python -m jml.cli --db runtime/jml.db submit --request sample_data/joiner.json
+python -m jml.cli --db runtime/jml.db approve --request JML-000001 --actor manager-01
+python -m jml.cli --db runtime/jml.db plan --request JML-000001 --actor iam-01
+python -m jml.cli --db runtime/jml.db execute --request JML-000001 --actor iam-01 --dry-run
+python -m jml.cli --db runtime/jml.db verify --request JML-000001 --actor verifier-01 --passed
+python -m jml.cli --db runtime/jml.db close --request JML-000001 --actor verifier-01 --reason "All post-change checks passed"
 ```
 
 Use [`sample_data/mover.json`](sample_data/mover.json) or [`sample_data/leaver.json`](sample_data/leaver.json) to test the other lifecycle events.
@@ -155,7 +155,7 @@ python -m unittest discover -v
 The current repository validation demonstrates:
 
 ```text
-6 tests - OK
+7 tests - OK
 Python compile check - OK
 CLI end-to-end smoke test - OK
 ```
